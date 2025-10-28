@@ -1,0 +1,1694 @@
+<script>
+// ===== MANAGER DASHBOARD FUNCTIONS =====
+const Dashboard = {
+  currentData: [],
+  charts: {},
+  isAuthenticated: false,
+  currentUser: null,
+
+  init() {
+    console.log("Dashboard initializing...");
+    // Check if already authenticated in this session
+    const savedAuth = sessionStorage.getItem('managerAuthenticated');
+    const savedUser = sessionStorage.getItem('managerUser');
+    
+    if (savedAuth === 'true' && savedUser) {
+      this.isAuthenticated = true;
+      this.currentUser = JSON.parse(savedUser);
+    }
+  },
+
+  showManagerPanel() {
+    console.log("Show manager panel called");
+    if (this.isAuthenticated && this.currentUser) {
+      this.showDashboard();
+    } else {
+      this.checkAuthentication();
+    }
+  },
+
+  checkAuthentication() {
+    console.log("Checking authentication...");
+    this.showEnhancedPasswordPrompt();
+  },
+
+  showEnhancedPasswordPrompt() {
+  // Remove any existing password modals first
+  document.querySelectorAll('.password-auth-modal').forEach(modal => modal.remove());
+  
+  // Create a beautiful password modal
+  const modal = document.createElement('div');
+  modal.className = 'modal password-auth-modal'; // Add unique class
+  modal.innerHTML = this.getPasswordModalHTML();
+  document.body.appendChild(modal);
+  
+  // Setup event listeners
+  this.setupPasswordModalEvents();
+  
+  // Focus on password input
+  setTimeout(() => {
+    const passwordInput = document.getElementById('enhancedPassword');
+    if (passwordInput) passwordInput.focus();
+  }, 100);
+}, // <-- COMMA ADDED HERE
+
+// Add to Dashboard object
+openWeeklyReports() {
+  google.script.run
+    .withSuccessHandler(html => {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = html;
+      document.body.appendChild(modal);
+    })
+    .withFailureHandler(error => {
+      alert('Error opening weekly reports: ' + error);
+    })
+    .include('weekly-reports');
+},
+
+// Add to Dashboard object
+openWeeklyReports() {
+  google.script.run
+    .withSuccessHandler(html => {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = html;
+      document.body.appendChild(modal);
+    })
+    .withFailureHandler(error => {
+      alert('Error opening weekly reports: ' + error);
+    })
+    .include('weekly-reports');
+},
+
+// Fix the getPasswordModalHTML function - ensure it's properly defined within Dashboard object
+getPasswordModalHTML() {
+  return `
+    <div class="modal-content" style="max-width: 400px; text-align: center;">
+      <div class="modal-header">
+        <div class="modal-title">🔐 Manager Access</div>
+        <button class="close-btn" onclick="this.closest('.password-auth-modal').remove(); Dashboard.showEngineerPanel()">×</button>
+      </div>
+      
+      <div style="padding: 20px;">
+        <div style="font-size: 48px; margin-bottom: 20px;">🚀</div>
+        <h3 style="color: var(--accent); margin-bottom: 10px;">Pyramakerz R&D System</h3>
+        <p style="color: var(--muted); margin-bottom: 25px;">Enter your department password to access the manager dashboard</p>
+        
+        <div class="form-group">
+          <input type="password" id="enhancedPassword" placeholder="Enter your password"
+                 style="width: 100%; padding: 12px; text-align: center; font-size: 16px; letter-spacing: 2px;">
+        </div>
+        
+        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+          <button class="btn btn-secondary" onclick="this.closest('.password-auth-modal').remove(); Dashboard.showEngineerPanel()" style="background: #6c757d;">
+            Cancel
+          </button>
+          <button class="btn" id="unlockDashboardBtn" style="background: var(--accent);">
+            Unlock Dashboard
+          </button>
+        </div>
+        
+        <div style="margin-top: 25px; padding: 15px; background: var(--glass); border-radius: 8px; font-size: 12px; color: var(--muted);">
+          <strong>Available Access:</strong><br>
+          • CTO & Senior Engineers Only
+        </div>
+      </div>
+    </div>
+  `;
+},
+
+setupPasswordModalEvents() {
+  // Add event listener for the unlock button
+  const unlockBtn = document.getElementById('unlockDashboardBtn');
+  if (unlockBtn) {
+    unlockBtn.addEventListener('click', () => {
+      this.authenticateEnhanced();
+    });
+  }
+  
+  // Add event listener for Enter key in password field
+  const passwordInput = document.getElementById('enhancedPassword');
+  if (passwordInput) {
+    passwordInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        this.authenticateEnhanced();
+      }
+    });
+  }
+},
+
+authenticateEnhanced() {
+  const passwordInput = document.getElementById('enhancedPassword');
+  if (!passwordInput) return;
+  
+  const password = passwordInput.value;
+  if (!password) {
+    this.showPasswordError('Please enter a password');
+    return;
+  }
+
+  console.log("Authenticating with enhanced system...");
+  
+  google.script.run
+    .withSuccessHandler((result) => {
+      console.log("Enhanced authentication result:", result);
+      if (result.isValid) {
+        this.handleSuccessfulAuth(result);
+      } else {
+        this.handleEnhancedAuthError('Invalid password. Please try again.');
+      }
+    })
+    .withFailureHandler((error) => {
+      console.error("Enhanced authentication error:", error);
+      this.handleEnhancedAuthError('Authentication failed: ' + error);
+    })
+    .validateEnhancedPassword(password);
+},
+
+handleSuccessfulAuth(authResult) {
+  this.isAuthenticated = true;
+  this.currentUser = authResult.userInfo;
+  
+  // Store in session storage
+  sessionStorage.setItem('managerAuthenticated', 'true');
+  sessionStorage.setItem('managerUser', JSON.stringify(authResult.userInfo));
+  
+  // Close any open password modals
+  document.querySelectorAll('.password-auth-modal').forEach(modal => modal.remove());
+  
+  // Show welcome animation and sound
+  this.showWelcomeAnimation(authResult.userInfo);
+},
+
+handleEnhancedAuthError(message) {
+  // Shake animation for wrong password
+  const passwordInput = document.getElementById('enhancedPassword');
+  if (passwordInput) {
+    passwordInput.style.animation = 'shake 0.5s ease-in-out';
+    setTimeout(() => {
+      passwordInput.style.animation = '';
+      passwordInput.value = '';
+      passwordInput.focus();
+    }, 500);
+  }
+  
+  // Show error message
+  this.showPasswordError(message);
+},
+
+showPasswordError(message) {
+  // Remove existing error messages
+  document.querySelectorAll('.password-error').forEach(el => el.remove());
+  
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'password-error';
+  errorDiv.style.cssText = `
+    color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
+    padding: 10px;
+    border-radius: 6px;
+    margin-top: 10px;
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    animation: fadeIn 0.3s ease;
+  `;
+  errorDiv.textContent = message;
+  
+  const passwordInput = document.getElementById('enhancedPassword');
+  if (passwordInput && passwordInput.parentNode) {
+    passwordInput.parentNode.appendChild(errorDiv);
+  }
+},
+
+showWelcomeAnimation(userInfo) {
+  // Create welcome overlay
+  const welcomeOverlay = document.createElement('div');
+  welcomeOverlay.id = 'welcomeOverlay';
+  welcomeOverlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--accent), #ff8c42);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    color: white;
+    font-family: 'Segoe UI', Arial, sans-serif;
+  `;
+
+  // Custom welcome messages based on department
+  let welcomeTitle = "Welcome Back!";
+  let welcomeSubtitle = userInfo.displayName;
+  let departmentInfo = userInfo.department === 'All' ? 'Full System Access' : userInfo.department + ' Department';
+  
+  // Custom messages for specific engineers
+  if (userInfo.name && userInfo.name.includes('CTO2025')) {
+    welcomeTitle = "Welcome CTO!";
+    welcomeSubtitle = "Engineer Abdulazim Elnemr";
+    departmentInfo = "Chief Technology Officer - Full System Access";
+  } else if (userInfo.name && userInfo.name.includes('EMB')) {
+    welcomeTitle = "Welcome Senior Engineer!";
+    welcomeSubtitle = "Engineer Seif";
+    departmentInfo = "Senior Embedded Systems Department";
+  } else if (userInfo.name && userInfo.name.includes('MEC2025')) {
+    welcomeTitle = "Welcome Senior Engineer!";
+    welcomeSubtitle = "Engineer Mohanad";
+    departmentInfo = "Senior Mechanical Engineering Department";
+  } else if (userInfo.name && userInfo.name.includes('AI2025')) {
+    welcomeTitle = "Welcome Senior Engineer!";
+    welcomeSubtitle = "Engineer Maged";
+    departmentInfo = "Senior Artificial Intelligence Department";
+  }
+
+  // Welcome content
+  welcomeOverlay.innerHTML = `
+    <div id="welcomeContent" style="text-align: center; transform: scale(0.8); opacity: 0; transition: all 0.8s ease;">
+      <div style="font-size: 80px; margin-bottom: 20px;">🎉</div>
+      <h1 style="font-size: 3em; margin-bottom: 10px; font-weight: 800;">${welcomeTitle}</h1>
+      <h2 style="font-size: 2em; margin-bottom: 20px; font-weight: 300;">${welcomeSubtitle}</h2>
+      <div style="font-size: 1.2em; opacity: 0.9; margin-bottom: 40px;">
+        ${departmentInfo}
+      </div>
+      <div id="loadingBar" style="width: 0%; height: 4px; background: white; border-radius: 2px; margin: 0 auto; transition: width 2s ease;"></div>
+    </div>
+  `;
+
+  document.body.appendChild(welcomeOverlay);
+
+  // Animate entrance
+  setTimeout(() => {
+    const welcomeContent = document.getElementById('welcomeContent');
+    const loadingBar = document.getElementById('loadingBar');
+    
+    if (welcomeContent) {
+      welcomeContent.style.transform = 'scale(1)';
+      welcomeContent.style.opacity = '1';
+    }
+    
+    if (loadingBar) {
+      loadingBar.style.width = '100%';
+    }
+    
+    // Play welcome sound
+    this.playWelcomeSound(userInfo.name);
+    
+  }, 100);
+
+  // Show dashboard after animation
+  setTimeout(() => {
+    this.showDashboard();
+    
+    // Animate exit
+    if (welcomeOverlay) {
+      welcomeOverlay.style.opacity = '0';
+      welcomeOverlay.style.transition = 'opacity 0.5s ease';
+      setTimeout(() => {
+        if (welcomeOverlay.parentNode) {
+          welcomeOverlay.parentNode.removeChild(welcomeOverlay);
+        }
+      }, 500);
+    }
+  }, 3000);
+},
+
+playWelcomeSound(userName) {
+  try {
+    // Create speech synthesis
+    if ('speechSynthesis' in window) {
+      const speech = new SpeechSynthesisUtterance();
+      
+      // Custom welcome messages
+      if (userName.includes('CTO2025')) {
+        speech.text = "Welcome Chief Technology Officer Abdulazim Elnemr! Dashboard unlocked with full administrative privileges.";
+      } else if (userName.includes('EMB')) {
+        speech.text = "Welcome Senior Embedded Engineer Seif! Embedded systems dashboard unlocked.";
+      } else if (userName.includes('MEC2025')) {
+        speech.text = "Welcome Senior Mechanical Engineer Mohanad! Mechanical engineering dashboard unlocked.";
+      } else if (userName.includes('AI2025')) {
+        speech.text = "Welcome Senior AI Engineer Maged! Artificial intelligence dashboard unlocked.";
+      } else {
+        speech.text = `Welcome ${userName}! Dashboard unlocked.`;
+      }
+      
+      speech.rate = 0.9;
+      speech.pitch = 1;
+      speech.volume = 1;
+      
+      // Try to use a nice voice
+      const voices = speechSynthesis.getVoices();
+      const englishVoice = voices.find(voice => 
+        voice.lang.includes('en') && voice.name.includes('Female')
+      );
+      
+      if (englishVoice) {
+        speech.voice = englishVoice;
+      }
+      
+      speechSynthesis.speak(speech);
+    }
+  } catch (error) {
+    console.log("Speech synthesis not available:", error);
+    // Fallback: Play a beep sound
+    this.playBeepSound();
+  }
+},
+
+playBeepSound() {
+  try {
+    // Create a simple beep sound using Web Audio API
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch (error) {
+    console.log("Audio not available:", error);
+  }
+},
+
+showDashboard() {
+  console.log("Showing dashboard for:", this.currentUser);
+  
+  // Show manager panel, hide engineer panel
+  document.getElementById('engineerPanel').style.display = 'none';
+  document.getElementById('previewPanel').style.display = 'block';
+  document.getElementById('managerBtn').classList.add('active');
+  document.getElementById('engineerBtn').classList.remove('active');
+  
+  // Update dashboard header with user info
+  this.updateDashboardHeader();
+  
+  // Now initialize the dashboard components
+  this.bindEvents();
+  this.loadDashboardData();
+  this.loadFilters();
+},
+
+updateDashboardHeader() {
+  const dashboardHeader = document.querySelector('#previewPanel h2');
+  if (dashboardHeader && this.currentUser) {
+    // Custom header based on user
+    let departmentHeader = this.currentUser.department;
+    if (this.currentUser.name.includes('CTO2025')) {
+      departmentHeader = "CTO Administration";
+    } else if (this.currentUser.name.includes('EMB')) {
+      departmentHeader = "Embedded Systems";
+    } else if (this.currentUser.name.includes('MEC2025')) {
+      departmentHeader = "Mechanical Engineering";
+    } else if (this.currentUser.name.includes('AI2025')) {
+      departmentHeader = "Artificial Intelligence";
+    }
+    
+    dashboardHeader.innerHTML = `📊 ${departmentHeader} Dashboard`;
+    
+    // Add user badge
+    const userBadge = document.createElement('div');
+    userBadge.style.cssText = `
+      display: inline-block;
+      background: var(--accent);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-left: 10px;
+      vertical-align: middle;
+    `;
+    
+    // Custom badge text
+    if (this.currentUser.name.includes('CTO2025')) {
+      userBadge.textContent = "CTO Abdulazim Elnemr";
+    } else if (this.currentUser.name.includes('EMB')) {
+      userBadge.textContent = "Sr. Engineer Seif";
+    } else if (this.currentUser.name.includes('MEC2025')) {
+      userBadge.textContent = "Sr. Engineer Mohanad";
+    } else if (this.currentUser.name.includes('AI2025')) {
+      userBadge.textContent = "Sr. Engineer Maged";
+    } else {
+      userBadge.textContent = this.currentUser.name;
+    }
+    
+    dashboardHeader.appendChild(userBadge);
+  }
+},
+
+showEngineerPanel() {
+  console.log("Showing engineer panel...");
+  document.getElementById('engineerPanel').style.display = 'block';
+  document.getElementById('previewPanel').style.display = 'none';
+  document.getElementById('engineerBtn').classList.add('active');
+  document.getElementById('managerBtn').classList.remove('active');
+  
+  // Clear authentication when switching to engineer panel
+  this.isAuthenticated = false;
+  this.currentUser = null;
+  sessionStorage.removeItem('managerAuthenticated');
+  sessionStorage.removeItem('managerUser');
+},
+
+bindEvents() {
+  console.log("Binding dashboard events...");
+  
+  // Filter events
+  const projectFilter = document.getElementById('projectFilter');
+  const statusFilter = document.getElementById('statusFilter');
+  
+  if (projectFilter) {
+    projectFilter.addEventListener('change', (e) => {
+      this.applyFilters();
+    });
+  }
+
+  if (statusFilter) {
+    statusFilter.addEventListener('change', (e) => {
+      this.applyFilters();
+    });
+  }
+
+  // Export buttons
+  const exportExcelBtn = document.getElementById('exportExcelBtn');
+  const exportPdfBtn = document.getElementById('exportPdfBtn');
+  
+  if (exportExcelBtn) {
+    exportExcelBtn.addEventListener('click', () => {
+      this.exportData('excel');
+    });
+  }
+
+  if (exportPdfBtn) {
+    exportPdfBtn.addEventListener('click', () => {
+      this.exportData('pdf');
+    });
+  }
+},
+
+async loadDashboardData() {
+  console.log("Loading dashboard data...");
+  try {
+    const summary = await google.script.run
+      .withSuccessHandler((result) => {
+        // Handle undefined or null result
+        if (!result) {
+          console.warn('Dashboard summary returned undefined, using default values');
+          result = { totalSubmissions: 0, uniqueEngineers: 0, activeProjects: 0 };
+        }
+        this.updateSummaryCards(result);
+        this.loadCharts();
+      })
+      .withFailureHandler((error) => {
+        console.error('Error loading dashboard summary:', error);
+        Utils.showNotification('Error loading dashboard data: ' + error, 'error');
+        // Use default values on error
+        this.updateSummaryCards({ totalSubmissions: 0, uniqueEngineers: 0, activeProjects: 0 });
+      })
+      .getDashboardSummary();
+
+  } catch (error) {
+    console.error('Error loading dashboard:', error);
+    Utils.showNotification('Error loading dashboard', 'error');
+    // Use default values on error
+    this.updateSummaryCards({ totalSubmissions: 0, uniqueEngineers: 0, activeProjects: 0 });
+  }
+},
+
+updateSummaryCards(summary) {
+  console.log("Updating summary cards:", summary);
+  
+  // Ensure summary is an object
+  if (!summary || typeof summary !== 'object') {
+    summary = { totalSubmissions: 0, uniqueEngineers: 0, activeProjects: 0 };
+  }
+  
+  const totalTasksEl = document.getElementById('totalTasks');
+  const totalEngineersEl = document.getElementById('totalEngineers');
+  const activeProjectsEl = document.getElementById('activeProjects');
+
+  if (totalTasksEl) totalTasksEl.textContent = summary.totalSubmissions || 0;
+  if (totalEngineersEl) totalEngineersEl.textContent = summary.uniqueEngineers || 0;
+  if (activeProjectsEl) activeProjectsEl.textContent = summary.activeProjects || 0;
+},
+
+async loadFilters() {
+  try {
+    const projects = await google.script.run
+      .withSuccessHandler((result) => {
+        // Handle undefined result
+        if (!result) {
+          console.warn('Projects returned undefined, using empty array');
+          result = [];
+        }
+        this.populateProjectSelect(result);
+      })
+      .withFailureHandler((error) => {
+        console.error('Error loading projects:', error);
+        // Use empty array on error
+        this.populateProjectSelect([]);
+      })
+      .getProjects();
+
+  } catch (error) {
+    console.error('Error loading filters:', error);
+    // Use empty array on error
+    this.populateProjectSelect([]);
+  }
+},
+
+populateProjectSelect(projects) {
+  const projectFilter = document.getElementById('projectFilter');
+  if (!projectFilter) return;
+  
+  projectFilter.innerHTML = '<option value="all">All Projects</option>';
+  
+  // Ensure projects is an array
+  if (!Array.isArray(projects)) {
+    projects = [];
+  }
+  
+  if (projects.length === 0) {
+    console.log('No projects found for filter');
+    // Add some default options
+    const defaultProjects = [
+      { id: 'RC', name: 'RC Car' },
+      { id: 'HY', name: 'Hydroponics' },
+      { id: 'GK', name: 'Generic Kit' }
+    ];
+    
+    defaultProjects.forEach(project => {
+      const option = document.createElement('option');
+      option.value = project.id;
+      option.textContent = project.name;
+      projectFilter.appendChild(option);
+    });
+  } else {
+    projects.forEach(project => {
+      const option = document.createElement('option');
+      option.value = project.id || project.name;
+      option.textContent = project.name;
+      projectFilter.appendChild(option);
+    });
+  }
+},
+
+loadCharts() {
+  console.log("Loading charts...");
+  
+  // Check if Google Charts is loaded
+  if (typeof google === 'undefined') {
+    console.warn('Google Charts not loaded yet, waiting...');
+    setTimeout(() => this.loadCharts(), 1000);
+    return;
+  }
+  
+  google.charts.load('current', {
+    packages: ['corechart', 'timeline', 'bar']
+  });
+  
+  google.charts.setOnLoadCallback(() => {
+    console.log('Google Charts loaded, drawing charts...');
+    this.loadChartData();
+  });
+},
+
+async loadChartData() {
+  const projectFilter = document.getElementById('projectFilter')?.value || 'all';
+  const statusFilter = document.getElementById('statusFilter')?.value || 'all';
+  
+  console.log("Loading chart data with filters:", { projectFilter, statusFilter });
+  
+  try {
+    const dashboardData = await google.script.run
+      .withSuccessHandler((data) => {
+        this.drawCharts(data);
+      })
+      .withFailureHandler((error) => {
+        console.error('Error loading chart data:', error);
+        this.drawCharts([]);
+      })
+      .getDashboardData(projectFilter, statusFilter);
+
+  } catch (error) {
+    console.error('Error loading chart data:', error);
+    this.drawCharts([]);
+  }
+},
+
+drawCharts(data) {
+  console.log("Drawing charts with data:", data);
+  
+  // Ensure data is an array
+  if (!Array.isArray(data)) {
+    data = [];
+  }
+  
+  // Draw department chart
+  this.drawDepartmentChart(data);
+  
+  // Draw status chart
+  this.drawStatusChart(data);
+  
+  // Only draw timeline if we have data with dates
+  if (data.length > 0) {
+    this.drawTimelineChart(data);
+  }
+},
+
+drawDepartmentChart(data) {
+  const container = document.getElementById('chart_dept');
+  if (!container) {
+    console.warn('Department chart container not found');
+    return;
+  }
+
+  try {
+    const chartData = new google.visualization.DataTable();
+    chartData.addColumn('string', 'Department');
+    chartData.addColumn('number', 'Tasks');
+
+    // Process data by department
+    const deptCounts = {};
+    data.forEach(item => {
+      deptCounts[item.department] = (deptCounts[item.department] || 0) + 1;
+    });
+
+    // If no data, show sample data
+    if (Object.keys(deptCounts).length === 0) {
+      deptCounts['Embedded'] = 8;
+      deptCounts['Mechanical'] = 6;
+      deptCounts['AI'] = 5;
+      deptCounts['Software'] = 7;
+      deptCounts['Electronics'] = 4;
+    }
+
+    const rows = Object.entries(deptCounts).map(([dept, count]) => [dept, count]);
+    chartData.addRows(rows);
+
+    const options = {
+      title: 'Task Distribution by Department',
+      titleTextStyle: { 
+        color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+        fontSize: 18,
+        bold: true,
+        fontName: 'Segoe UI'
+      },
+      backgroundColor: {
+        fill: 'transparent',
+        stroke: 'rgba(255,255,255,0.1)',
+        strokeWidth: 1
+      },
+      legend: { 
+        textStyle: { 
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12
+        },
+        position: 'labeled',
+        alignment: 'center'
+      },
+      // NEW CATCHY PROFESSIONAL COLORS
+      colors: ['#FF6B35', '#00A8E8', '#2EC4B6', '#FF9F1C', '#E71D36', '#6A4C93', '#F8FF52', '#8AC926'],
+      pieHole: 0.4,
+      pieSliceText: 'value',
+      pieSliceTextStyle: {
+        color: 'white',
+        fontSize: 14,
+        bold: true
+      },
+      chartArea: {
+        width: '90%',
+        height: '80%',
+        top: 20,
+        left: 10,
+        right: 10,
+        bottom: 20
+      },
+      tooltip: {
+        textStyle: {
+          fontSize: 12,
+          bold: true
+        },
+        showColorCode: true
+      },
+      animation: {
+        startup: true,
+        duration: 1000,
+        easing: 'out'
+      },
+      slices: {
+        0: { offset: 0.05 },
+        1: { offset: 0.03 },
+        2: { offset: 0.02 }
+      },
+      is3D: false
+    };
+
+    const chart = new google.visualization.PieChart(container);
+    chart.draw(chartData, options);
+  } catch (error) {
+    console.error('Error drawing department chart:', error);
+    container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--muted);">Chart Error: ' + error.message + '</div>';
+  }
+},
+
+drawStatusChart(data) {
+  const container = document.getElementById('chart_status');
+  if (!container) {
+    console.warn('Status chart container not found');
+    return;
+  }
+
+  try {
+    const chartData = new google.visualization.DataTable();
+    chartData.addColumn('string', 'Status');
+    chartData.addColumn('number', 'Tasks');
+
+    const statusCounts = {};
+    data.forEach(item => {
+      const status = item.status || 'Completed';
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+
+    // If no data, show sample data
+    if (Object.keys(statusCounts).length === 0) {
+      statusCounts['Completed'] = 12;
+      statusCounts['In Progress'] = 8;
+      statusCounts['Pending'] = 5;
+      statusCounts['On Hold'] = 3;
+      statusCounts['Cancelled'] = 1;
+    }
+
+    const rows = Object.entries(statusCounts).map(([status, count]) => [status, count]);
+    chartData.addRows(rows);
+
+    const options = {
+      title: 'Task Status Overview',
+      titleTextStyle: { 
+        color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+        fontSize: 18,
+        bold: true,
+        fontName: 'Segoe UI'
+      },
+      backgroundColor: {
+        fill: 'transparent',
+        stroke: 'rgba(255,255,255,0.1)',
+        strokeWidth: 1
+      },
+      legend: { 
+        textStyle: { 
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12
+        }
+      },
+      // NEW CATCHY PROFESSIONAL COLORS
+      colors: ['#2EC4B6', '#FF9F1C', '#E71D36', '#6A4C93', '#FF6B35'],
+      bar: { 
+        groupWidth: '70%'
+      },
+      chartArea: {
+        width: '80%',
+        height: '70%',
+        top: 60,
+        left: 80,
+        right: 20
+      },
+      hAxis: {
+        textStyle: {
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12
+        },
+        gridlines: {
+          color: 'rgba(255,255,255,0.1)',
+          count: 5
+        },
+        minorGridlines: {
+          count: 0
+        },
+        baselineColor: 'rgba(255,255,255,0.3)',
+        title: 'Number of Tasks',
+        titleTextStyle: {
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12,
+          italic: false
+        }
+      },
+      vAxis: {
+        textStyle: {
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12
+        },
+        title: 'Task Status',
+        titleTextStyle: {
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12,
+          italic: false
+        }
+      },
+      animation: {
+        startup: true,
+        duration: 1000,
+        easing: 'out'
+      }
+    };
+
+    const chart = new google.visualization.BarChart(container);
+    chart.draw(chartData, options);
+  } catch (error) {
+    console.error('Error drawing status chart:', error);
+    container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--muted);">Chart Error: ' + error.message + '</div>';
+  }
+},
+
+drawTimelineChart(data) {
+  const container = document.getElementById('chart_timeline');
+  if (!container) {
+    console.warn('Timeline chart container not found');
+    return;
+  }
+
+  try {
+    const chartData = new google.visualization.DataTable();
+    chartData.addColumn({ type: 'string', id: 'Engineer' });
+    chartData.addColumn({ type: 'date', id: 'Start' });
+    chartData.addColumn({ type: 'date', id: 'End' });
+    chartData.addColumn({ type: 'string', id: 'Task', role: 'tooltip' });
+
+    // Process timeline data - create more realistic sample data if needed
+    const recentData = data.slice(-8); // Show fewer for better readability
+    
+    const rows = recentData.map((item, index) => {
+      const start = new Date();
+      start.setDate(start.getDate() - Math.floor(Math.random() * 7)); // Random days in past week
+      start.setHours(8 + Math.floor(Math.random() * 4), 0, 0); // Random morning hours
+      
+      const end = new Date(start);
+      end.setHours(start.getHours() + 2 + Math.floor(Math.random() * 6), 0, 0); // 2-8 hour tasks
+      
+      const taskName = item.taskName || `Task ${item.id || index + 1}`;
+      
+      return [
+        item.engineer || `Engineer ${index + 1}`, 
+        start, 
+        end,
+        `${taskName}\\n${start.toLocaleDateString()} ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
+      ];
+    });
+
+    chartData.addRows(rows);
+
+    const options = {
+      title: 'Recent Task Timeline',
+      titleTextStyle: { 
+        color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+        fontSize: 18,
+        bold: true,
+        fontName: 'Segoe UI'
+      },
+      backgroundColor: {
+        fill: 'transparent',
+        stroke: 'rgba(255,255,255,0.1)',
+        strokeWidth: 1
+      },
+      timeline: { 
+        showRowLabels: true,
+        rowLabelStyle: {
+          fontName: 'Segoe UI',
+          fontSize: 12,
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          bold: true
+        },
+        barLabelStyle: {
+          fontName: 'Segoe UI',
+          fontSize: 10,
+          color: 'white'
+        }
+      },
+      // NEW CATCHY PROFESSIONAL COLORS
+      colors: ['#FF6B35', '#00A8E8', '#2EC4B6', '#FF9F1C', '#E71D36', '#6A4C93', '#F8FF52', '#8AC926'],
+      avoidOverlappingGridLines: true,
+      tooltip: {
+        isHtml: true,
+        textStyle: {
+          fontSize: 12
+        }
+      },
+      chartArea: {
+        height: '75%',
+        width: '85%',
+        left: 100
+      }
+    };
+
+    const chart = new google.visualization.Timeline(container);
+    chart.draw(chartData, options);
+  } catch (error) {
+    console.error('Error drawing timeline chart:', error);
+    container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--muted);">Timeline data unavailable</div>';
+  }
+},
+
+applyFilters() {
+  const projectFilter = document.getElementById('projectFilter')?.value || 'all';
+  const statusFilter = document.getElementById('statusFilter')?.value || 'all';
+  
+  console.log("Applying filters:", { projectFilter, statusFilter });
+  // Apply filters and refresh charts
+  this.loadChartData();
+},
+
+async exportData(type) {
+  try {
+    const projectFilter = document.getElementById('projectFilter')?.value || 'all';
+    const statusFilter = document.getElementById('statusFilter')?.value || 'all';
+    
+    const url = await google.script.run
+      .withFailureHandler((error) => {
+        Utils.showNotification('Export error: ' + error, 'error');
+      })
+      .exportDashboardData(projectFilter, type, statusFilter);
+
+    if (url) {
+      window.open(url, '_blank');
+      Utils.showNotification(`${type.toUpperCase()} export started`, 'success');
+    }
+  } catch (error) {
+    Utils.showNotification('Export failed: ' + error, 'error');
+  }
+},
+
+// Quick Actions
+refreshAllData() {
+  google.script.run
+    .withSuccessHandler(() => {
+      Utils.showNotification('Data refreshed successfully!', 'success');
+      this.loadDashboardData();
+    })
+    .withFailureHandler((error) => {
+      Utils.showNotification('Error refreshing data: ' + error, 'error');
+    })
+    .refreshWebAppData();
+},
+
+addSampleData() {
+  if (confirm('This will add sample projects and tasks for testing. Continue?')) {
+    google.script.run
+      .withSuccessHandler((result) => {
+        if (result && result.success) {
+          Utils.showNotification('Sample data added!', 'success');
+          this.loadDashboardData();
+        } else {
+          Utils.showNotification('Failed to add sample data: ' + (result?.error || 'Unknown error'), 'error');
+        }
+      })
+      .withFailureHandler((error) => {
+        Utils.showNotification('Error adding sample data: ' + error, 'error');
+      })
+      .addSampleData();
+  }
+},
+
+showDeadlineManager() {
+  if (typeof DeadlineManager !== 'undefined') {
+    DeadlineManager.showDeadlineManager();
+  } else {
+    Utils.showNotification('Deadline Manager not available', 'error');
+  }
+},
+
+openSheets() {
+  google.script.run
+    .withSuccessHandler((url) => {
+      if (url) {
+        window.open(url, '_blank');
+      }
+    })
+    .withFailureHandler((error) => {
+      Utils.showNotification('Error opening sheets: ' + error, 'error');
+    })
+    .getSpreadsheetUrl();
+},
+
+// Logout function
+logout() {
+  this.isAuthenticated = false;
+  this.currentUser = null;
+  sessionStorage.removeItem('managerAuthenticated');
+  sessionStorage.removeItem('managerUser');
+  this.showEngineerPanel();
+  Utils.showNotification('Successfully logged out', 'success');
+}
+};
+
+// Add CSS animations
+const authStyles = `
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .password-error {
+    animation: fadeIn 0.3s ease !important;
+  }
+`;
+
+// ===== DEADLINE MANAGER FUNCTIONS =====
+const DeadlineManager = {
+  modal: null,
+  projects: [],
+  currentEdits: {},
+
+  showDeadlineManager() {
+    this.showDeadlineModal();
+  },
+
+  showDeadlineModal() {
+    this.modal = document.createElement('div');
+    this.modal.className = 'modal';
+    this.modal.innerHTML = this.getDeadlineModalHTML();
+    document.body.appendChild(this.modal);
+    
+    this.loadProjectsWithDeadlines();
+  },
+
+  getDeadlineModalHTML() {
+    return `
+      <div class="modal-content" style="max-width: 95%; max-height: 90vh; overflow: hidden;">
+        <div class="modal-header">
+          <div class="modal-title">📅 Manage Project Deadlines</div>
+          <button class="close-btn" onclick="DeadlineManager.closeModal()">×</button>
+        </div>
+        
+        <div style="display: flex; gap: 20px; height: 70vh;">
+          <!-- Projects List -->
+          <div style="flex: 1; border-right: 1px solid var(--border); padding-right: 20px; overflow-y: auto;">
+            <div class="section-title" style="margin-bottom: 15px;">📋 Projects</div>
+            <div id="projectsList" style="max-height: 65vh; overflow-y: auto;">
+              <div style="text-align: center; padding: 40px; color: var(--muted);">
+                Loading projects...
+              </div>
+            </div>
+          </div>
+          
+          <!-- Tasks for Selected Project -->
+          <div style="flex: 2; overflow-y: auto;">
+            <div class="section-title" style="margin-bottom: 15px;" id="selectedProjectTitle">Select a project</div>
+            <div id="tasksList" style="max-height: 60vh; overflow-y: auto;">
+              <div style="text-align: center; padding: 40px; color: var(--muted);">
+                Select a project to view and edit tasks
+              </div>
+            </div>
+            
+            <!-- Summary -->
+            <div id="deadlineSummary" style="margin-top: 20px; padding: 15px; background: var(--glass); border-radius: 8px; display: none;">
+              <div class="section-title" style="margin-bottom: 10px;">📊 Deadline Summary</div>
+              <div id="summaryContent"></div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+          <button class="btn btn-secondary" onclick="DeadlineManager.closeModal()" style="background: #6c757d;">
+            ❌ Cancel
+          </button>
+          <button class="btn btn-success" onclick="DeadlineManager.saveAllChanges()" style="background: #28a745;">
+            💾 Save All Changes
+          </button>
+        </div>
+      </div>
+    `;
+  },
+
+  async loadProjectsWithDeadlines() {
+    try {
+      const projects = await google.script.run
+        .withFailureHandler((error) => {
+          console.error('Error loading projects:', error);
+          this.showError('Failed to load projects: ' + error);
+        })
+        .getProjectsWithDeadlines();
+
+      this.projects = projects;
+      this.renderProjectsList();
+    } catch (error) {
+      console.error('Error loading projects:', error);
+      this.showError('Failed to load projects');
+    }
+  },
+
+  renderProjectsList() {
+    const container = document.getElementById('projectsList');
+    if (!container) return;
+
+    if (!this.projects || this.projects.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--muted);">
+          No projects found with deadlines
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = '';
+    
+    this.projects.forEach((project, index) => {
+      const projectCard = document.createElement('div');
+      projectCard.className = 'project-deadline-card';
+      projectCard.innerHTML = `
+        <div class="project-header">
+          <div class="project-name">${project.name}</div>
+          <div class="project-id">${project.id}</div>
+        </div>
+        <div class="project-details">
+          <div class="project-dept">${project.departments}</div>
+          <div class="project-manager">${project.manager}</div>
+        </div>
+        <div class="project-stats">
+          <div class="stat">
+            <span class="stat-label">Tasks:</span>
+            <span class="stat-value">${project.tasks.length}</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Status:</span>
+            <span class="stat-value ${project.status.toLowerCase()}">${project.status}</span>
+          </div>
+        </div>
+        <div class="project-deadline">
+          <span class="deadline-label">Deadline:</span>
+          <span class="deadline-date">${project.deadline || 'Not set'}</span>
+        </div>
+      `;
+      
+      projectCard.addEventListener('click', () => {
+        this.selectProject(project, index);
+      });
+      
+      container.appendChild(projectCard);
+    });
+  },
+
+  selectProject(project, index) {
+    // Remove selection from all cards
+    document.querySelectorAll('.project-deadline-card').forEach(card => {
+      card.classList.remove('selected');
+    });
+    
+    // Add selection to clicked card
+    const cards = document.querySelectorAll('.project-deadline-card');
+    if (cards[index]) {
+      cards[index].classList.add('selected');
+    }
+    
+    // Update selected project title
+    const title = document.getElementById('selectedProjectTitle');
+    if (title) {
+      title.innerHTML = `📝 Tasks for: <strong>${project.name}</strong>`;
+    }
+    
+    // Render tasks for this project
+    this.renderTasksList(project);
+    
+    // Show summary
+    this.updateDeadlineSummary(project);
+  },
+
+  renderTasksList(project) {
+    const container = document.getElementById('tasksList');
+    if (!container) return;
+
+    if (!project.tasks || project.tasks.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--muted);">
+          No tasks found for this project
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = '';
+    
+    project.tasks.forEach((task, taskIndex) => {
+      const taskRow = document.createElement('div');
+      taskRow.className = 'task-deadline-row';
+      taskRow.innerHTML = `
+        <div class="task-header">
+          <div class="task-id">${task.id}</div>
+          <div class="task-name">${task.name}</div>
+        </div>
+        <div class="task-details">
+          <div class="form-group">
+            <label>Assigned To</label>
+            <input type="text" class="task-assigned" value="${task.assignedTo || ''}" 
+                   data-project="${project.id}" data-task="${task.id}" data-field="assignedTo">
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <input type="text" class="task-department" value="${task.department || ''}" 
+                   data-project="${project.id}" data-task="${task.id}" data-field="department">
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="task-status" data-project="${project.id}" data-task="${task.id}" data-field="status">
+              <option value="Not Started" ${task.status === 'Not Started' ? 'selected' : ''}>Not Started</option>
+              <option value="In Progress" ${task.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+              <option value="Completed" ${task.status === 'Completed' ? 'selected' : ''}>Completed</option>
+              <option value="On Hold" ${task.status === 'On Hold' ? 'selected' : ''}>On Hold</option>
+              <option value="Cancelled" ${task.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Deadline</label>
+            <input type="date" class="task-deadline" value="${task.deadline || ''}" 
+                   data-project="${project.id}" data-task="${task.id}" data-field="deadline">
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea class="task-notes" data-project="${project.id}" data-task="${task.id}" data-field="notes" 
+                      rows="2" style="width: 100%; padding: 6px; font-size: 12px; resize: vertical;">${task.notes || ''}</textarea>
+          </div>
+        </div>
+        <div class="task-actions">
+          <button class="btn btn-small" onclick="DeadlineManager.saveTaskChanges('${project.id}', '${task.id}')" 
+                  style="background: var(--accent); padding: 6px 12px; font-size: 12px;">
+            💾 Save Task
+          </button>
+        </div>
+      `;
+      
+      // Add event listeners for changes
+      const inputs = taskRow.querySelectorAll('input, select, textarea');
+      inputs.forEach(input => {
+        input.addEventListener('change', (e) => {
+          this.recordChange(e.target);
+        });
+      });
+      
+      container.appendChild(taskRow);
+    });
+  },
+
+  recordChange(input) {
+    const projectId = input.getAttribute('data-project');
+    const taskId = input.getAttribute('data-task');
+    const field = input.getAttribute('data-field');
+    const value = input.value;
+    
+    if (!this.currentEdits[projectId]) {
+      this.currentEdits[projectId] = {};
+    }
+    if (!this.currentEdits[projectId][taskId]) {
+      this.currentEdits[projectId][taskId] = {};
+    }
+    
+    this.currentEdits[projectId][taskId][field] = value;
+    
+    // Visual feedback
+    input.style.borderColor = 'var(--accent)';
+    input.style.backgroundColor = 'rgba(255, 106, 0, 0.1)';
+  },
+
+  async saveTaskChanges(projectId, taskId) {
+    if (!this.currentEdits[projectId] || !this.currentEdits[projectId][taskId]) {
+      this.showNotification('No changes to save for this task', 'info');
+      return;
+    }
+    
+    const changes = this.currentEdits[projectId][taskId];
+    
+    try {
+      const result = await google.script.run
+        .withFailureHandler((error) => {
+          this.showNotification('Error saving task: ' + error, 'error');
+        })
+        .updateTaskDeadline(projectId, taskId, changes);
+
+      if (result.success) {
+        this.showNotification('Task updated successfully!', 'success');
+        
+        // Reset visual feedback
+        const inputs = document.querySelectorAll(`[data-project="${projectId}"][data-task="${taskId}"]`);
+        inputs.forEach(input => {
+          input.style.borderColor = '';
+          input.style.backgroundColor = '';
+        });
+        
+        // Remove from current edits
+        delete this.currentEdits[projectId][taskId];
+        
+        // Refresh the project data
+        this.loadProjectsWithDeadlines();
+      } else {
+        this.showNotification('Error: ' + result.error, 'error');
+      }
+    } catch (error) {
+      this.showNotification('Error saving task changes', 'error');
+    }
+  },
+
+  async saveAllChanges() {
+    if (Object.keys(this.currentEdits).length === 0) {
+      this.showNotification('No changes to save', 'info');
+      return;
+    }
+    
+    try {
+      const result = await google.script.run
+        .withFailureHandler((error) => {
+          this.showNotification('Error saving changes: ' + error, 'error');
+        })
+        .updateMultipleTaskDeadlines(this.currentEdits);
+
+      if (result.success) {
+        this.showNotification(`Successfully updated ${result.updatedCount} tasks!`, 'success');
+        
+        // Reset all visual feedback
+        document.querySelectorAll('input, select, textarea').forEach(input => {
+          input.style.borderColor = '';
+          input.style.backgroundColor = '';
+        });
+        
+        // Clear current edits
+        this.currentEdits = {};
+        
+        // Refresh data
+        this.loadProjectsWithDeadlines();
+      } else {
+        this.showNotification('Error: ' + result.error, 'error');
+      }
+    } catch (error) {
+      this.showNotification('Error saving all changes', 'error');
+    }
+  },
+
+  updateDeadlineSummary(project) {
+    const summarySection = document.getElementById('deadlineSummary');
+    const summaryContent = document.getElementById('summaryContent');
+    
+    if (!summarySection || !summaryContent) return;
+    
+    if (!project.tasks || project.tasks.length === 0) {
+      summarySection.style.display = 'none';
+      return;
+    }
+    
+    const now = new Date();
+    let overdue = 0;
+    let dueThisWeek = 0;
+    let dueNextWeek = 0;
+    let noDeadline = 0;
+    let completed = 0;
+    
+    project.tasks.forEach(task => {
+      if (task.status === 'Completed') {
+        completed++;
+        return;
+      }
+      
+      if (!task.deadline) {
+        noDeadline++;
+        return;
+      }
+      
+      const deadline = new Date(task.deadline);
+      const daysUntilDeadline = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilDeadline < 0) {
+        overdue++;
+      } else if (daysUntilDeadline <= 7) {
+        dueThisWeek++;
+      } else if (daysUntilDeadline <= 14) {
+        dueNextWeek++;
+      }
+    });
+    
+    summaryContent.innerHTML = `
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;">
+        <div class="summary-item ${overdue > 0 ? 'overdue' : ''}">
+          <div class="summary-count">${overdue}</div>
+          <div class="summary-label">Overdue</div>
+        </div>
+        <div class="summary-item ${dueThisWeek > 0 ? 'urgent' : ''}">
+          <div class="summary-count">${dueThisWeek}</div>
+          <div class="summary-label">Due This Week</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-count">${dueNextWeek}</div>
+          <div class="summary-label">Due Next Week</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-count">${completed}</div>
+          <div class="summary-label">Completed</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-count">${noDeadline}</div>
+          <div class="summary-label">No Deadline</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-count">${project.tasks.length}</div>
+          <div class="summary-label">Total Tasks</div>
+        </div>
+      </div>
+    `;
+    
+    summarySection.style.display = 'block';
+  },
+
+  showNotification(message, type = 'info') {
+    // Use existing Utils if available, otherwise create simple alert
+    if (typeof Utils !== 'undefined' && Utils.showNotification) {
+      Utils.showNotification(message, type);
+    } else {
+      alert(`[${type.toUpperCase()}] ${message}`);
+    }
+  },
+
+  showError(message) {
+    this.showNotification(message, 'error');
+  },
+
+  closeModal() {
+    if (this.modal) {
+      this.modal.remove();
+      this.modal = null;
+    }
+  }
+};
+
+// Add CSS styles for deadline manager
+const deadlineManagerStyles = `
+  .project-deadline-card {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .project-deadline-card:hover {
+    border-color: var(--accent);
+    background: var(--glass);
+  }
+
+  .project-deadline-card.selected {
+    border-color: var(--accent);
+    background: rgba(255, 106, 0, 0.1);
+  }
+
+  .project-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .project-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .project-id {
+    background: var(--accent);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+  }
+
+  .project-details {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .project-stats {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 8px;
+  }
+
+  .stat {
+    display: flex;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .stat-label {
+    color: var(--muted);
+  }
+
+  .stat-value {
+    font-weight: 600;
+  }
+
+  .stat-value.active {
+    color: #28a745;
+  }
+
+  .stat-value.completed {
+    color: #28a745;
+  }
+
+  .stat-value.hold {
+    color: #ffc107;
+  }
+
+  .project-deadline {
+    font-size: 12px;
+  }
+
+  .deadline-label {
+    color: var(--muted);
+  }
+
+  .deadline-date {
+    font-weight: 600;
+    margin-left: 5px;
+  }
+
+  .task-deadline-row {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+  }
+
+  .task-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .task-id {
+    background: var(--accent);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+  }
+
+  .task-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .task-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .task-details .form-group {
+    margin-bottom: 0;
+  }
+
+  .task-details label {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .task-details input,
+  .task-details select,
+  .task-details textarea {
+    padding: 6px;
+    font-size: 12px;
+  }
+
+  .task-actions {
+    text-align: right;
+  }
+
+  .summary-item {
+    padding: 8px;
+    background: var(--input-bg);
+    border-radius: 6px;
+  }
+
+  .summary-count {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 2px;
+  }
+
+  .summary-label {
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .summary-item.overdue {
+    background: rgba(220, 53, 69, 0.2);
+    border: 1px solid rgba(220, 53, 69, 0.5);
+  }
+
+  .summary-item.urgent {
+    background: rgba(255, 193, 7, 0.2);
+    border: 1px solid rgba(255, 193, 7, 0.5);
+  }
+`;
+
+// Inject styles for deadline manager
+let deadlineManagerStyleSheet = document.getElementById('deadline-manager-styles');
+if (!deadlineManagerStyleSheet) {
+    deadlineManagerStyleSheet = document.createElement('style');
+    deadlineManagerStyleSheet.id = 'deadline-manager-styles';
+    deadlineManagerStyleSheet.textContent = deadlineManagerStyles;
+    document.head.appendChild(deadlineManagerStyleSheet);
+}
+
+// Make DeadlineManager available globally
+window.DeadlineManager = DeadlineManager;
+
+// Inject styles
+const styleSheet = document.createElement('style');
+styleSheet.textContent = authStyles;
+document.head.appendChild(styleSheet);
+
+// Make Dashboard available globally for quick actions
+window.Dashboard = Dashboard;
+</script>

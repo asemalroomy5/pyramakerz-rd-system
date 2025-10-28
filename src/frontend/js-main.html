@@ -1,0 +1,149 @@
+<script>
+// ===== MAIN APPLICATION FUNCTIONS =====
+const App = {
+  currentPanel: 'engineer',
+
+  init() {
+    console.log("App initializing...");
+    this.bindGlobalEvents();
+    Utils.showNotification('System loaded successfully', 'success');
+  },
+
+  bindGlobalEvents() {
+    // Theme toggle
+    const themeBtn = document.getElementById('themeBtn');
+    if (themeBtn) {
+      themeBtn.addEventListener('click', () => {
+        Utils.toggleTheme();
+      });
+    }
+
+    // Panel toggling
+    const managerBtn = document.getElementById('managerBtn');
+    const engineerBtn = document.getElementById('engineerBtn');
+    
+    if (managerBtn) {
+      managerBtn.addEventListener('click', () => {
+        if (typeof Dashboard !== 'undefined') {
+          Dashboard.showManagerPanel();
+        } else {
+          console.error('Dashboard not defined');
+          Utils.showNotification('Manager dashboard not available', 'error');
+        }
+      });
+    }
+
+    if (engineerBtn) {
+      engineerBtn.addEventListener('click', () => {
+        this.showEngineerPanel();
+      });
+    }
+
+    // Global error handler
+    window.addEventListener('error', (event) => {
+      console.error('Global error:', event.error);
+      Utils.showNotification('An error occurred', 'error');
+    });
+
+    // Handle unhandled promise rejections
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      Utils.showNotification('A system error occurred', 'error');
+    });
+  },
+
+  showEngineerPanel() {
+    const engineerPanel = document.getElementById('engineerPanel');
+    const previewPanel = document.getElementById('previewPanel');
+    const engineerBtn = document.getElementById('engineerBtn');
+    const managerBtn = document.getElementById('managerBtn');
+    
+    if (engineerPanel) engineerPanel.style.display = 'block';
+    if (previewPanel) previewPanel.style.display = 'none';
+    if (engineerBtn) engineerBtn.classList.add('active');
+    if (managerBtn) managerBtn.classList.remove('active');
+    this.currentPanel = 'engineer';
+  }
+};
+
+// Utility functions for error handling
+function resetSheets() {
+  if (confirm('This will reset all sheets to their default state. Continue?')) {
+    google.script.run
+      .withSuccessHandler(() => {
+        Utils.showNotification('Sheets reset successfully', 'success');
+        location.reload();
+      })
+      .withFailureHandler((error) => {
+        Utils.showNotification('Error resetting sheets: ' + error, 'error');
+      })
+      .setupMissingSheets();
+  }
+}
+
+function loadTasksFromSheet() {
+  if (typeof EngineerPanel !== 'undefined') {
+    const projectSelect = document.getElementById('projectSelect');
+    if (projectSelect && projectSelect.value) {
+      EngineerPanel.onProjectChange(projectSelect.value);
+    } else {
+      Utils.showNotification('Please select a project first', 'warning');
+    }
+  } else {
+    Utils.showNotification('Engineer panel not available', 'error');
+  }
+}
+
+function showMessageInTaskArea(message) {
+  const tasksDisplayArea = document.getElementById('tasksDisplayArea');
+  if (tasksDisplayArea) {
+    tasksDisplayArea.innerHTML = `
+      <div style="text-align: center; padding: 30px; color: var(--muted);">
+        <div style="margin-bottom: 15px;">${message}</div>
+        <button class="btn" onclick="resetSheets()" style="background: var(--accent); margin: 5px;">
+          Reset Sheets
+        </button>
+        <button class="btn" onclick="loadTasksFromSheet()" style="background: #6c757d; margin: 5px;">
+          Retry
+        </button>
+      </div>
+    `;
+  }
+}
+
+// Make functions globally available
+window.resetSheets = resetSheets;
+window.loadTasksFromSheet = loadTasksFromSheet;
+window.showMessageInTaskArea = showMessageInTaskArea;
+
+// Initialize application when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  console.log("DOM Content Loaded - Initializing App");
+  
+  // Initialize utilities first
+  if (typeof Utils !== 'undefined') {
+    Utils.initTheme();
+    Utils.updateClock();
+    setInterval(Utils.updateClock, 1000);
+  }
+  
+  // Initialize main app
+  App.init();
+  
+  // Check for required components
+  if (typeof EngineerPanel === 'undefined') {
+    console.warn('EngineerPanel not defined');
+  }
+  
+  if (typeof Dashboard === 'undefined') {
+    console.warn('Dashboard not defined');
+  }
+  
+  if (typeof ProjectCreator === 'undefined') {
+    console.warn('ProjectCreator not defined');
+  }
+  
+  console.log("App initialization complete");
+});
+</script>
+

@@ -1,0 +1,316 @@
+<script>
+// ===== CHARTS FUNCTIONS =====
+const Charts = {
+  init() {
+    // Load Google Charts library
+    google.charts.load('current', {
+      packages: ['corechart', 'timeline']
+    });
+  },
+
+  drawDepartmentChart(data) {
+  const container = document.getElementById('chart_dept');
+  if (!container) {
+    console.warn('Department chart container not found');
+    return;
+  }
+
+  try {
+    const chartData = new google.visualization.DataTable();
+    chartData.addColumn('string', 'Department');
+    chartData.addColumn('number', 'Tasks');
+
+    // Process data by department
+    const deptCounts = {};
+    data.forEach(item => {
+      deptCounts[item.department] = (deptCounts[item.department] || 0) + 1;
+    });
+
+    // If no data, show sample data
+    if (Object.keys(deptCounts).length === 0) {
+      deptCounts['Embedded'] = 8;
+      deptCounts['Mechanical'] = 6;
+      deptCounts['AI'] = 5;
+      deptCounts['Software'] = 7;
+      deptCounts['Electronics'] = 4;
+    }
+
+    const rows = Object.entries(deptCounts).map(([dept, count]) => [dept, count]);
+    chartData.addRows(rows);
+
+    const options = {
+      title: 'Task Distribution by Department',
+      titleTextStyle: { 
+        color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+        fontSize: 18,
+        bold: true,
+        fontName: 'Segoe UI'
+      },
+      backgroundColor: {
+        fill: 'transparent',
+        stroke: 'rgba(255,255,255,0.1)',
+        strokeWidth: 1
+      },
+      legend: { 
+        textStyle: { 
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12
+        },
+        position: 'labeled',
+        alignment: 'center'
+      },
+      // FIXED: Dark theme compatible colors
+      colors: ['#FF6B35', '#00A8E8', '#2EC4B6', '#FF9F1C', '#E71D36', '#6A4C93', '#F8FF52', '#8AC926'],
+      pieHole: 0.4,
+      pieSliceText: 'value',
+      pieSliceTextStyle: {
+        color: 'white',
+        fontSize: 14,
+        bold: true
+      },
+      chartArea: {
+        width: '90%',
+        height: '80%',
+        top: 20,
+        left: 10,
+        right: 10,
+        bottom: 20
+      },
+      tooltip: {
+        textStyle: {
+          fontSize: 12,
+          bold: true
+        },
+        showColorCode: true
+      },
+      animation: {
+        startup: true,
+        duration: 1000,
+        easing: 'out'
+      },
+      slices: {
+        0: { offset: 0.05 },
+        1: { offset: 0.03 },
+        2: { offset: 0.02 }
+      },
+      is3D: false
+    };
+
+    const chart = new google.visualization.PieChart(container);
+    chart.draw(chartData, options);
+  } catch (error) {
+    console.error('Error drawing department chart:', error);
+    container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--muted);">Chart Error: ' + error.message + '</div>';
+  }
+},
+
+drawStatusChart(data) {
+  const container = document.getElementById('chart_status');
+  if (!container) {
+    console.warn('Status chart container not found');
+    return;
+  }
+
+  try {
+    const chartData = new google.visualization.DataTable();
+    chartData.addColumn('string', 'Status');
+    chartData.addColumn('number', 'Tasks');
+
+    const statusCounts = {};
+    data.forEach(item => {
+      const status = item.status || 'Completed';
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+
+    // If no data, show sample data
+    if (Object.keys(statusCounts).length === 0) {
+      statusCounts['Completed'] = 12;
+      statusCounts['In Progress'] = 8;
+      statusCounts['Pending'] = 5;
+      statusCounts['On Hold'] = 3;
+      statusCounts['Cancelled'] = 1;
+    }
+
+    const rows = Object.entries(statusCounts).map(([status, count]) => [status, count]);
+    chartData.addRows(rows);
+
+    const options = {
+      title: 'Task Status Overview',
+      titleTextStyle: { 
+        color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+        fontSize: 18,
+        bold: true,
+        fontName: 'Segoe UI'
+      },
+      backgroundColor: {
+        fill: 'transparent',
+        stroke: 'rgba(255,255,255,0.1)',
+        strokeWidth: 1
+      },
+      legend: { 
+        textStyle: { 
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12
+        }
+      },
+      // FIXED: Dark theme compatible colors
+      colors: ['#2EC4B6', '#FF9F1C', '#E71D36', '#6A4C93', '#FF6B35'],
+      bar: { 
+        groupWidth: '70%'
+      },
+      chartArea: {
+        width: '80%',
+        height: '70%',
+        top: 60,
+        left: 80,
+        right: 20
+      },
+      hAxis: {
+        textStyle: {
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12
+        },
+        gridlines: {
+          color: 'rgba(255,255,255,0.1)',
+          count: 5
+        },
+        minorGridlines: {
+          count: 0
+        },
+        baselineColor: 'rgba(255,255,255,0.3)',
+        title: 'Number of Tasks',
+        titleTextStyle: {
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12,
+          italic: false
+        }
+      },
+      vAxis: {
+        textStyle: {
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12
+        },
+        title: 'Task Status',
+        titleTextStyle: {
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          fontSize: 12,
+          italic: false
+        }
+      },
+      animation: {
+        startup: true,
+        duration: 1000,
+        easing: 'out'
+      }
+    };
+
+    const chart = new google.visualization.BarChart(container);
+    chart.draw(chartData, options);
+  } catch (error) {
+    console.error('Error drawing status chart:', error);
+    container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--muted);">Chart Error: ' + error.message + '</div>';
+  }
+},
+
+drawTimelineChart(data) {
+  const container = document.getElementById('chart_timeline');
+  if (!container) {
+    console.warn('Timeline chart container not found');
+    return;
+  }
+
+  try {
+    const chartData = new google.visualization.DataTable();
+    chartData.addColumn({ type: 'string', id: 'Engineer' });
+    chartData.addColumn({ type: 'date', id: 'Start' });
+    chartData.addColumn({ type: 'date', id: 'End' });
+    chartData.addColumn({ type: 'string', id: 'Task', role: 'tooltip' });
+
+    // Process timeline data - create more realistic sample data if needed
+    const recentData = data.slice(-8); // Show fewer for better readability
+    
+    const rows = recentData.map((item, index) => {
+      const start = new Date();
+      start.setDate(start.getDate() - Math.floor(Math.random() * 7)); // Random days in past week
+      start.setHours(8 + Math.floor(Math.random() * 4), 0, 0); // Random morning hours
+      
+      const end = new Date(start);
+      end.setHours(start.getHours() + 2 + Math.floor(Math.random() * 6), 0, 0); // 2-8 hour tasks
+      
+      const taskName = item.taskName || `Task ${item.id || index + 1}`;
+      
+      return [
+        item.engineer || `Engineer ${index + 1}`, 
+        start, 
+        end,
+        `${taskName}\\n${start.toLocaleDateString()} ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
+      ];
+    });
+
+    chartData.addRows(rows);
+
+    const options = {
+      title: 'Recent Task Timeline',
+      titleTextStyle: { 
+        color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+        fontSize: 18,
+        bold: true,
+        fontName: 'Segoe UI'
+      },
+      backgroundColor: {
+        fill: 'transparent',
+        stroke: 'rgba(255,255,255,0.1)',
+        strokeWidth: 1
+      },
+      timeline: { 
+        showRowLabels: true,
+        rowLabelStyle: {
+          fontName: 'Segoe UI',
+          fontSize: 12,
+          color: getComputedStyle(document.body).getPropertyValue('--text') || '#f0f4f8',
+          bold: true
+        },
+        barLabelStyle: {
+          fontName: 'Segoe UI',
+          fontSize: 10,
+          color: 'white'
+        }
+      },
+      // FIXED: Dark theme compatible colors
+      colors: ['#FF6B35', '#00A8E8', '#2EC4B6', '#FF9F1C', '#E71D36', '#6A4C93', '#F8FF52', '#8AC926'],
+      avoidOverlappingGridLines: true,
+      tooltip: {
+        isHtml: true,
+        textStyle: {
+          fontSize: 12
+        }
+      },
+      chartArea: {
+        height: '75%',
+        width: '85%',
+        left: 100
+      }
+    };
+
+    const chart = new google.visualization.Timeline(container);
+    chart.draw(chartData, options);
+  } catch (error) {
+    console.error('Error drawing timeline chart:', error);
+    container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--muted);">Timeline data unavailable</div>';
+  }
+},
+
+  drawAllCharts(dashboardData) {
+    google.charts.setOnLoadCallback(() => {
+      this.drawDepartmentChart(dashboardData);
+      this.drawStatusChart(dashboardData);
+      this.drawTimelineChart(dashboardData);
+    });
+  }
+};
+
+// Initialize charts when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  Charts.init();
+});
+</script>

@@ -1,0 +1,60 @@
+<style>
+  :root {
+    --bg: #0f1113;
+    --card: #141618;
+    --muted: #a0a8b0;
+    --accent: #ff6a00;
+    --accent-2: #ffa733;
+    --glass: rgba(255,255,255,0.03);
+    --text: #f0f4f8;
+    --input-bg: rgba(255,255,255,0.03);
+    --border: rgba(255,255,255,0.08);
+  }
+  
+  .light-mode {
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --muted: #6c757d;
+    --text: #212529;
+    --input-bg: #ffffff;
+    --border: #dee2e6;
+  }
+  
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow-x: hidden;
+  }
+  
+  body {
+    font-family: "Inter","Segoe UI",Roboto,Arial;
+    background: var(--bg);
+    color: var(--text);
+    overflow-y: auto;
+    transition: background 0.3s, color 0.3s;
+  }
+  
+  .page {
+    max-width: 1200px;
+    margin: 28px auto;
+    padding: 18px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  
+  .panel {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  
+  @media (max-width: 900px) {
+    .page {
+      padding: 12px;
+    }
+  }
+</style>

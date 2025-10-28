@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  
+  <!-- CSS Files -->
+  <?!= include('css-main'); ?>
+  <?!= include('css-components'); ?>
+</head>
+<body>
+  <!-- Background Elements -->
+  <?!= include('background-elements'); ?>
+
+  <div class="page" id="mainPage">
+    <!-- HEADER -->
+    <?!= include('header'); ?>
+
+    <!-- ENGINEER PANEL -->
+    <?!= include('engineer-panel'); ?>
+
+    <!-- MANAGER PANEL -->
+    <?!= include('manager-panel'); ?>
+  </div>
+
+  <!-- CORRECT ORDER -->
+<?!= include('js-utils'); ?>           <!-- Base utilities first -->
+<?!= include('js-main'); ?>            <!-- Main app logic -->
+<?!= include('js-charts'); ?>          <!-- Charts -->
+<?!= include('js-engineer'); ?>        <!-- Engineer panel -->
+<?!= include('js-manager'); ?>         <!-- Manager dashboard -->
+<?!= include('js-project-creator'); ?> <!-- Project creator -->
+</body>
+</html>

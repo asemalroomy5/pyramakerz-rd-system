@@ -1,0 +1,1068 @@
+<script>
+// ===== ENGINEER PANEL FUNCTIONS =====
+const EngineerPanel = {
+  currentTasks: [],
+  totalWorkHours: 0,
+  engineers: [],
+  currentEngineer: null,
+  isLoggedIn: false,
+  assignedProjects: [],
+
+  async init() {
+    console.log("EngineerPanel initializing...");
+    await this.loadEngineers();
+    this.bindEvents();
+    this.setDefaultDate();
+    this.showLoginSection();
+  },
+
+  showLoginSection() {
+    document.getElementById('engineerPanel').style.display = 'block';
+    document.getElementById('engineerLoginSection').style.display = 'block';
+    document.getElementById('engineerMainInterface').style.display = 'none';
+  },
+
+  showMainInterface() {
+    document.getElementById('engineerLoginSection').style.display = 'none';
+    document.getElementById('engineerMainInterface').style.display = 'block';
+  },
+
+  setDefaultDate() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('reportDate').value = today;
+  },
+
+  async loadEngineers() {
+    try {
+      console.log("Loading engineers...");
+      
+      this.engineers = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((engineers) => {
+            console.log("Engineers loaded:", engineers);
+            resolve(engineers || []);
+          })
+          .withFailureHandler((error) => {
+            console.error('Error loading engineers:', error);
+            this.showNotification('Error loading engineers list', 'error');
+            resolve([]);
+          })
+          .getAllEngineersWithDetails();
+      });
+
+      this.populateEngineerDropdown();
+    } catch (error) {
+      console.error('Error in loadEngineers:', error);
+      this.engineers = [];
+      this.populateEngineerDropdown();
+    }
+  },
+
+  populateEngineerDropdown() {
+    const select = document.getElementById('loginEngineerName');
+    if (!select) return;
+
+    select.innerHTML = '<option value="" disabled selected>-- select your name --</option>';
+    
+    this.engineers.forEach(engineer => {
+      const option = document.createElement('option');
+      option.value = engineer.id || engineer.name;
+      option.textContent = engineer.name;
+      option.setAttribute('data-department', engineer.department);
+      select.appendChild(option);
+    });
+  },
+
+  bindEvents() {
+    // Login events
+    document.getElementById('loginBtn').addEventListener('click', () => this.login());
+    document.getElementById('loginPassword').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') this.login();
+    });
+
+    // Logout event
+    document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
+
+    // Change password events
+    document.getElementById('changePasswordBtn').addEventListener('click', () => this.showChangePasswordModal());
+    document.getElementById('savePasswordBtn').addEventListener('click', () => this.changePassword());
+
+    // Task events
+    document.getElementById('addCustomTaskBtn').addEventListener('click', () => this.addCustomTask());
+    document.getElementById('submitAllBtn').addEventListener('click', () => this.submitAllTasks());
+
+    // Date change event
+    document.getElementById('reportDate').addEventListener('change', () => this.loadAssignedProjects());
+
+    // Time input changes for progress bar
+    document.addEventListener('change', (e) => {
+      if (e.target.classList.contains('task-start') || e.target.classList.contains('task-end')) {
+        this.updateProgressBar();
+      }
+    });
+  },
+
+  async login() {
+    const engineerSelect = document.getElementById('loginEngineerName');
+    const passwordInput = document.getElementById('loginPassword');
+    
+    if (!engineerSelect.value) {
+      this.showNotification('Please select your name', 'error');
+      return;
+    }
+
+    if (!passwordInput.value) {
+      this.showNotification('Please enter your password', 'error');
+      return;
+    }
+
+    const engineerId = engineerSelect.value;
+    const password = passwordInput.value;
+    const selectedOption = engineerSelect.options[engineerSelect.selectedIndex];
+    const engineerName = selectedOption.textContent;
+
+    try {
+      const result = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .validateEngineerLogin(engineerId, password);
+      });
+
+      if (result.success) {
+        this.currentEngineer = this.engineers.find(eng => 
+          (eng.id === engineerId) || (eng.name === engineerId)
+        );
+        this.isLoggedIn = true;
+        
+        document.getElementById('loggedInEngineerName').textContent = engineerName;
+        this.showMainInterface();
+        this.loadAssignedProjects();
+        this.showNotification('Login successful!', 'success');
+      } else {
+        this.showNotification('Invalid password', 'error');
+        passwordInput.value = '';
+        passwordInput.focus();
+      }
+    } catch (error) {
+      this.showNotification('Login error: ' + error, 'error');
+    }
+  },
+
+  logout() {
+    this.isLoggedIn = false;
+    this.currentEngineer = null;
+    this.currentTasks = [];
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('tasksContainer').innerHTML = '';
+    document.getElementById('assignedProjectsContainer').innerHTML = '';
+    this.showLoginSection();
+    this.showNotification('Logged out successfully', 'info');
+  },
+
+  async loadAssignedProjects() {
+    if (!this.currentEngineer) return;
+
+    try {
+      const projects = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .getAssignedProjectsForEngineer(this.currentEngineer.name);
+      });
+
+      this.assignedProjects = projects || [];
+      this.populateAssignedProjects();
+    } catch (error) {
+      console.error('Error loading assigned projects:', error);
+      this.assignedProjects = [];
+      this.populateAssignedProjects();
+    }
+  },
+
+  populateAssignedProjects() {
+    const container = document.getElementById('assignedProjectsContainer');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (this.assignedProjects.length === 0) {
+      container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--muted);">No assigned projects found.</div>';
+      return;
+    }
+
+    this.assignedProjects.forEach(project => {
+      const projectCard = document.createElement('div');
+      projectCard.className = 'project-card';
+      projectCard.style.cssText = `
+        background: var(--glass);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        border-left: 4px solid var(--accent);
+        cursor: pointer;
+        transition: all 0.3s;
+      `;
+      projectCard.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h4 style="margin: 0 0 5px 0;">${project.name}</h4>
+            <div style="font-size: 12px; color: var(--muted);">
+              Department: ${project.department} | Status: ${project.status}
+            </div>
+          </div>
+          <button class="btn small" onclick="EngineerPanel.loadProjectTasks('${project.id}')">
+            Load Tasks
+          </button>
+        </div>
+      `;
+      
+      projectCard.addEventListener('mouseenter', () => {
+        projectCard.style.transform = 'translateY(-2px)';
+        projectCard.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+      });
+      
+      projectCard.addEventListener('mouseleave', () => {
+        projectCard.style.transform = 'translateY(0)';
+        projectCard.style.boxShadow = 'none';
+      });
+      
+      container.appendChild(projectCard);
+    });
+  },
+
+  async loadProjectTasks(projectId) {
+    if (!this.currentEngineer) return;
+
+    const project = this.assignedProjects.find(p => p.id === projectId);
+    if (!project) return;
+
+    try {
+      const tasks = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .getTasksForEngineerProject(this.currentEngineer.name, projectId);
+      });
+
+      this.populateTasks(tasks || [], project);
+    } catch (error) {
+      console.error('Error loading project tasks:', error);
+      this.showNotification('Error loading tasks for project', 'error');
+    }
+  },
+
+  populateTasks(tasks, project) {
+    const container = document.getElementById('tasksContainer');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    this.currentTasks = [];
+    
+    if (!tasks || tasks.length === 0) {
+      container.innerHTML = `
+        <div class="form-section">
+          <div style="text-align: center; padding: 20px; color: var(--muted);">
+            No tasks found for ${project.name}. You can add custom tasks below.
+          </div>
+        </div>
+      `;
+    } else {
+      // Filter out tasks with status "Done" from previous days
+      const today = document.getElementById('reportDate').value;
+      const filteredTasks = tasks.filter(task => 
+        !(task.status === 'done' && task.lastSubmitted && task.lastSubmitted !== today)
+      );
+
+      if (filteredTasks.length === 0) {
+        container.innerHTML = `
+          <div class="form-section">
+            <div style="text-align: center; padding: 20px; color: var(--muted);">
+              All tasks for ${project.name} are completed for today!
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      filteredTasks.forEach((task, index) => {
+        const taskBlock = this.createAssignedTaskBlock(task, index, project);
+        container.appendChild(taskBlock);
+        this.currentTasks.push({...task, projectId: project.id, projectName: project.name, type: 'assigned'});
+      });
+    }
+    
+    this.updateProgressBar();
+  },
+
+  createAssignedTaskBlock(task, index, project) {
+    const div = document.createElement('div');
+    div.className = 'task-block';
+    div.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+        <h4 style="margin: 0;">Task ${index + 1}: ${task.name}</h4>
+        <div style="font-size: 12px; color: var(--muted); background: var(--glass); padding: 4px 8px; border-radius: 4px;">
+          ${project.name}
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>Description</label>
+        <div style="background: var(--glass); padding: 10px; border-radius: 6px; font-size: 14px;">
+          ${task.description || 'No description provided'}
+        </div>
+      </div>
+
+      <!-- Deliverables Checklist -->
+      <div class="form-group">
+        <label>Deliverables Checklist</label>
+        <div id="checklist-${task.id}" class="checklist-container">
+          <!-- Checklist items will be populated dynamically -->
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+        <div>
+          <label>Start Time</label>
+          <input type="time" class="task-start" value="${this.calculateAutoStartTime(index)}">
+        </div>
+        <div>
+          <label>End Time</label>
+          <input type="time" class="task-end" value="${this.calculateAutoEndTime(index)}">
+        </div>
+      </div>
+
+      <!-- Trello Status -->
+      <div class="form-group">
+        <label>Status</label>
+        <div class="trello-status">
+          <div class="status-option status-todo" data-status="todo">📋 To Do</div>
+          <div class="status-option status-inprogress" data-status="inprogress">🔄 In Progress</div>
+          <div class="status-option status-review" data-status="review">👀 Review</div>
+          <div class="status-option status-blocked" data-status="blocked">🚫 Blocked</div>
+          <div class="status-option status-done" data-status="done">✅ Done</div>
+        </div>
+        <input type="hidden" class="task-status" value="${task.status || 'todo'}">
+      </div>
+
+      <input type="hidden" class="task-id" value="${task.id}">
+      <input type="hidden" class="task-project-id" value="${project.id}">
+    `;
+
+    this.addTaskBlockEventListeners(div);
+    this.populateChecklist(div, task);
+    this.setInitialStatus(div, task.status);
+    
+    return div;
+  },
+
+  populateChecklist(taskBlock, task) {
+    const checklistContainer = taskBlock.querySelector('.checklist-container');
+    if (!checklistContainer || !task.description) return;
+
+    // Parse bullet points from description
+    const bulletPoints = task.description.split('\n').filter(line => 
+      line.trim().startsWith('-') || line.trim().startsWith('•') || line.trim().startsWith('*')
+    );
+
+    if (bulletPoints.length === 0) return;
+
+    checklistContainer.innerHTML = '';
+    bulletPoints.forEach((point, index) => {
+      const cleanPoint = point.replace(/^[-•*]\s*/, '').trim();
+      const checklistItem = document.createElement('div');
+      checklistItem.className = 'checklist-item';
+      checklistItem.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        background: var(--glass);
+        border-radius: 4px;
+        margin-bottom: 5px;
+      `;
+      checklistItem.innerHTML = `
+        <input type="checkbox" class="deliverable-checkbox" data-task="${task.id}" data-index="${index}">
+        <span class="deliverable-text">${cleanPoint}</span>
+      `;
+      checklistContainer.appendChild(checklistItem);
+    });
+
+    // Add event listeners to checkboxes
+    const checkboxes = checklistContainer.querySelectorAll('.deliverable-checkbox');
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', () => this.updateTaskStatusFromChecklist(taskBlock));
+    });
+  },
+
+  updateTaskStatusFromChecklist(taskBlock) {
+    const checkboxes = taskBlock.querySelectorAll('.deliverable-checkbox');
+    const allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
+    
+    if (allChecked && checkboxes.length > 0) {
+      const doneOption = taskBlock.querySelector('.status-option[data-status="done"]');
+      if (doneOption) {
+        this.selectStatus(doneOption);
+      }
+    }
+  },
+
+  calculateAutoStartTime(taskIndex) {
+    const baseTime = 9 * 60; // 9:00 AM in minutes
+    const interval = 30; // 30 minutes between tasks
+    const totalMinutes = baseTime + (taskIndex * interval);
+    
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  },
+
+  calculateAutoEndTime(taskIndex) {
+    const baseTime = 9 * 60; // 9:00 AM in minutes
+    const taskDuration = 60; // 60 minutes per task
+    const interval = 30; // 30 minutes between tasks
+    const totalMinutes = baseTime + (taskIndex * interval) + taskDuration;
+    
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  },
+
+  createCustomTaskBlock(task, index) {
+    const div = document.createElement('div');
+    div.className = 'task-block';
+    div.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h4 style="margin: 0;">Custom Task ${index + 1}</h4>
+        <button class="btn btn-danger small" onclick="EngineerPanel.removeCustomTask(this)">Remove</button>
+      </div>
+      
+      <div class="form-group">
+        <label>Task Name</label>
+        <input type="text" class="custom-task-name" placeholder="Enter task name" value="${task.name}">
+      </div>
+
+      <div class="form-group">
+        <label>Description</label>
+        <textarea class="custom-task-description" placeholder="Describe the task...">${task.description}</textarea>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+        <div>
+          <label>Start Time</label>
+          <input type="time" class="task-start" value="${task.start}">
+        </div>
+        <div>
+          <label>End Time</label>
+          <input type="time" class="task-end" value="${task.end}">
+        </div>
+      </div>
+
+      <!-- Trello Status for Custom Tasks -->
+      <div class="form-group">
+        <label>Status</label>
+        <div class="trello-status">
+          <div class="status-option status-todo" data-status="todo">📋 To Do</div>
+          <div class="status-option status-inprogress" data-status="inprogress">🔄 In Progress</div>
+          <div class="status-option status-review" data-status="review">👀 Review</div>
+          <div class="status-option status-blocked" data-status="blocked">🚫 Blocked</div>
+          <div class="status-option status-done" data-status="done">✅ Done</div>
+        </div>
+        <input type="hidden" class="task-status" value="${task.status}">
+      </div>
+    `;
+
+    this.addTaskBlockEventListeners(div);
+    this.setInitialStatus(div, task.status);
+    
+    return div;
+  },
+
+  addCustomTask() {
+    const container = document.getElementById('tasksContainer');
+    if (!container) return;
+    
+    const taskCount = container.querySelectorAll('.task-block').length + 1;
+    
+    const newTask = {
+      id: "custom_" + Date.now(),
+      name: "Custom Task " + taskCount,
+      description: "",
+      start: this.calculateAutoStartTime(taskCount - 1),
+      end: this.calculateAutoEndTime(taskCount - 1),
+      status: "todo",
+      type: "custom"
+    };
+    
+    const taskBlock = this.createCustomTaskBlock(newTask, taskCount - 1);
+    container.appendChild(taskBlock);
+    this.currentTasks.push(newTask);
+    this.updateProgressBar();
+  },
+
+  removeCustomTask(button) {
+    const taskBlock = button.closest('.task-block');
+    const taskId = taskBlock.querySelector('.custom-task-name')?.value || '';
+    
+    if (taskBlock) {
+      taskBlock.remove();
+      this.currentTasks = this.currentTasks.filter(task => task.id !== taskId);
+      this.updateProgressBar();
+    }
+  },
+
+  addTaskBlockEventListeners(taskBlock) {
+    // Status option click handlers
+    const statusOptions = taskBlock.querySelectorAll('.status-option');
+    statusOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        this.selectStatus(option);
+      });
+    });
+
+    // Time input change handlers
+    const timeInputs = taskBlock.querySelectorAll('.task-start, .task-end');
+    timeInputs.forEach(input => {
+      input.addEventListener('change', () => {
+        this.updateProgressBar();
+      });
+    });
+
+    // Custom task name and description change handlers
+    const customNameInput = taskBlock.querySelector('.custom-task-name');
+    const customDescInput = taskBlock.querySelector('.custom-task-description');
+    
+    if (customNameInput) {
+      customNameInput.addEventListener('input', (e) => {
+        const taskIndex = Array.from(taskBlock.parentNode.children).indexOf(taskBlock);
+        if (this.currentTasks[taskIndex]) {
+          this.currentTasks[taskIndex].name = e.target.value;
+        }
+      });
+    }
+    
+    if (customDescInput) {
+      customDescInput.addEventListener('input', (e) => {
+        const taskIndex = Array.from(taskBlock.parentNode.children).indexOf(taskBlock);
+        if (this.currentTasks[taskIndex]) {
+          this.currentTasks[taskIndex].description = e.target.value;
+        }
+      });
+    }
+  },
+
+  setInitialStatus(taskBlock, status) {
+    const statusOption = taskBlock.querySelector(`.status-option[data-status="${status}"]`);
+    if (statusOption) {
+      this.selectStatus(statusOption);
+    }
+  },
+
+  selectStatus(element) {
+    if (!element) return;
+    
+    // Remove selected class from all status options in this task
+    const statusOptions = element.parentElement.querySelectorAll('.status-option');
+    statusOptions.forEach(opt => {
+      opt.classList.remove('selected');
+    });
+    
+    // Add selected class to clicked option
+    element.classList.add('selected');
+    
+    // Update the hidden input value
+    const statusInput = element.closest('.task-block').querySelector('.task-status');
+    if (statusInput) {
+      statusInput.value = element.getAttribute('data-status');
+    }
+  },
+
+  updateProgressBar() {
+    const container = document.getElementById('tasksContainer');
+    if (!container) return;
+    
+    let totalMinutes = 0;
+    const taskBlocks = container.querySelectorAll('.task-block');
+
+    taskBlocks.forEach(block => {
+      const startInput = block.querySelector('.task-start');
+      const endInput = block.querySelector('.task-end');
+      
+      if (startInput && endInput) {
+        const startTime = startInput.value;
+        const endTime = endInput.value;
+        
+        if (startTime && endTime) {
+          const start = this.timeToMinutes(startTime);
+          const end = this.timeToMinutes(endTime);
+          
+          if (end > start) {
+            totalMinutes += (end - start);
+          }
+        }
+      }
+    });
+
+    const totalHours = (totalMinutes / 60).toFixed(1);
+    const progressPercent = Math.min((totalHours / 8) * 100, 100);
+
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+
+    if (progressBar) {
+      progressBar.style.width = progressPercent + '%';
+    }
+
+    if (progressText) {
+      progressText.textContent = totalHours + 'h / 8h';
+      
+      // Color coding
+      if (totalHours >= 8) {
+        progressText.style.color = '#28a745';
+      } else if (totalHours >= 6) {
+        progressText.style.color = '#ffc107';
+      } else {
+        progressText.style.color = '#dc3545';
+      }
+    }
+  },
+
+  timeToMinutes(timeString) {
+    if (!timeString) return 0;
+    const [hours, minutes] = timeString.split(':').map(Number);
+    return hours * 60 + minutes;
+  },
+
+  async submitAllTasks() {
+    if (!this.isLoggedIn || !this.currentEngineer) {
+      this.showNotification('Please login first', 'error');
+      return;
+    }
+
+    const reportDate = document.getElementById('reportDate').value;
+    if (!reportDate) {
+      this.showNotification('Please select a report date', 'error');
+      return;
+    }
+
+    const taskBlocks = document.querySelectorAll('.task-block');
+    if (taskBlocks.length === 0) {
+      this.showNotification('No tasks to submit', 'warning');
+      return;
+    }
+    
+    const assignedEntries = [];
+    const customEntries = [];
+    
+    taskBlocks.forEach(block => {
+      const startTime = block.querySelector('.task-start')?.value;
+      const endTime = block.querySelector('.task-end')?.value;
+      const status = block.querySelector('.task-status')?.value || 'todo';
+      
+      // Check if it's an assigned task or custom task
+      const taskId = block.querySelector('.task-id')?.value;
+      const projectId = block.querySelector('.task-project-id')?.value;
+      
+      if (taskId && projectId) {
+        // Assigned task
+        const taskName = block.querySelector('h4')?.textContent.replace(/^Task \d+:\s*/, '');
+        const description = block.querySelector('.task-description')?.textContent || '';
+        
+        if (taskName) {
+          assignedEntries.push({
+            taskId: taskId,
+            projectId: projectId,
+            taskName: taskName,
+            description: description,
+            start: startTime,
+            end: endTime,
+            status: status,
+            engineer: this.currentEngineer.name,
+            department: this.currentEngineer.department,
+            reportDate: reportDate
+          });
+        }
+      } else {
+        // Custom task
+        const taskName = block.querySelector('.custom-task-name')?.value;
+        const description = block.querySelector('.custom-task-description')?.value;
+        
+        if (taskName) {
+          customEntries.push({
+            taskName: taskName,
+            description: description,
+            start: startTime,
+            end: endTime,
+            status: status,
+            engineer: this.currentEngineer.name,
+            department: this.currentEngineer.department,
+            reportDate: reportDate,
+            hoursSpent: this.calculateHoursSpent(startTime, endTime)
+          });
+        }
+      }
+    });
+
+    try {
+      // Submit assigned tasks
+      if (assignedEntries.length > 0) {
+        const assignedResult = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .submitAssignedTasks({
+              engineer: this.currentEngineer.name,
+              entries: assignedEntries
+            });
+        });
+
+        if (assignedResult && assignedResult.success) {
+          this.showNotification(`Submitted ${assignedEntries.length} assigned tasks`, 'success');
+        }
+      }
+
+      // Submit custom tasks
+      if (customEntries.length > 0) {
+        const customResult = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .submitCustomTasks({
+              engineer: this.currentEngineer.name,
+              entries: customEntries
+            });
+        });
+
+        if (customResult && customResult.success) {
+          this.showNotification(`Submitted ${customEntries.length} custom tasks`, 'success');
+        }
+      }
+
+      // Clear tasks after successful submission
+      if (assignedEntries.length > 0 || customEntries.length > 0) {
+        document.getElementById('tasksContainer').innerHTML = '';
+        this.currentTasks = [];
+        this.updateProgressBar();
+        this.loadAssignedProjects(); // Reload to refresh task status
+      }
+
+    } catch (error) {
+      this.showNotification('Submission error: ' + error, 'error');
+    }
+  },
+
+  calculateHoursSpent(startTime, endTime) {
+    if (!startTime || !endTime) return 0;
+    const start = this.timeToMinutes(startTime);
+    const end = this.timeToMinutes(endTime);
+    return ((end - start) / 60).toFixed(2);
+  },
+
+  showChangePasswordModal() {
+    document.getElementById('changePasswordModal').style.display = 'block';
+  },
+
+  async changePassword() {
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      this.showNotification('Please fill all password fields', 'error');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      this.showNotification('New passwords do not match', 'error');
+      return;
+    }
+
+    if (!this.currentEngineer) {
+      this.showNotification('No engineer selected', 'error');
+      return;
+    }
+
+    try {
+      const result = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .changeEngineerPassword(this.currentEngineer.id, currentPassword, newPassword);
+      });
+
+      if (result.success) {
+        this.showNotification('Password changed successfully', 'success');
+        document.getElementById('changePasswordModal').style.display = 'none';
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+      } else {
+        this.showNotification(result.error || 'Failed to change password', 'error');
+      }
+    } catch (error) {
+      this.showNotification('Error changing password: ' + error, 'error');
+    }
+  },
+
+  showNotification(message, type = 'info') {
+    // Create a subtle notification system without popups
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 6px;
+      color: white;
+      font-weight: 600;
+      z-index: 10000;
+      animation: slideInRight 0.3s ease;
+      max-width: 300px;
+    `;
+    
+    switch(type) {
+      case 'success':
+        notification.style.background = '#28a745';
+        break;
+      case 'error':
+        notification.style.background = '#dc3545';
+        break;
+      case 'warning':
+        notification.style.background = '#ffc107';
+        notification.style.color = '#000';
+        break;
+      default:
+        notification.style.background = '#17a2b8';
+    }
+    
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+      notification.style.animation = 'slideOutRight 0.3s ease';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 3000);
+  }
+};
+
+// Add CSS animations and styles
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  
+  @keyframes slideOutRight {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+  }
+  
+  .trello-status {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  .status-option {
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-align: center;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.3s;
+  }
+  
+  .status-option.selected {
+    border-color: currentColor;
+    font-weight: bold;
+  }
+  
+  .status-todo { background: #e3f2fd; color: #1976d2; }
+  .status-inprogress { background: #fff3e0; color: #f57c00; }
+  .status-review { background: #f3e5f5; color: #7b1fa2; }
+  .status-blocked { background: #ffebee; color: #d32f2f; }
+  .status-done { background: #e8f5e8; color: #388e3c; }
+  
+  .checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: var(--glass);
+    border-radius: 4px;
+    margin-bottom: 5px;
+  }
+  
+  .checklist-item input[type="checkbox"] {
+    transform: scale(1.2);
+  }
+  
+  .checklist-item .deliverable-text {
+    flex: 1;
+  }
+  
+  .btn-danger {
+    background: #dc3545;
+    color: white;
+  }
+  
+  .btn-danger:hover {
+    background: #c82333;
+  }
+  
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+  }
+  
+  .modal-content {
+    background: var(--card);
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90%;
+    overflow: auto;
+    border: 2px solid var(--accent);
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  
+  .modal-title {
+    color: var(--accent);
+    font-size: 20px;
+    font-weight: 700;
+  }
+  
+  .close-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 24px;
+    cursor: pointer;
+  }
+  
+  .form-section {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  
+  .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  
+  input[type="text"],
+  select,
+  textarea,
+  input[type="date"],
+  input[type="time"],
+  input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+    background: var(--input-bg);
+    color: var(--text);
+  }
+  
+  input[type="text"]:focus,
+  select:focus,
+  textarea:focus,
+  input[type="date"]:focus,
+  input[type="time"]:focus,
+  input[type="password"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  
+  .btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.3s;
+  }
+  
+  .btn:hover {
+    background: var(--primary-dark);
+  }
+  
+  .btn-secondary {
+    background: #6c757d;
+  }
+  
+  .btn-secondary:hover {
+    background: #5a6268;
+  }
+  
+  .btn-success {
+    background: #28a745;
+  }
+  
+  .btn-success:hover {
+    background: #218838;
+  }
+  
+  .btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+`;
+document.head.appendChild(style);
+
+// Initialize engineer panel when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  console.log("DOM loaded - Initializing EngineerPanel...");
+  EngineerPanel.init().catch(error => {
+    console.error("Failed to initialize EngineerPanel:", error);
+  });
+});
+</script>

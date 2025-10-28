@@ -1,0 +1,155 @@
+<aside class="panel" id="previewPanel" style="display:none;">
+  <h2>📊 <span id="dashboardTitle">Manager Dashboard</span></h2>
+  
+  <!-- Add logout button -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div></div>
+    <button class="btn btn-secondary" id="logoutBtn" style="background: #6c757d; padding: 8px 16px;">
+      🔓 Logout
+    </button>
+  </div>
+  
+  <div class="cards">
+    <div class="card">
+      <div class="big" id="totalTasks">0</div>
+      <div class="meta">Total Tasks</div>
+    </div>
+    <div class="card">
+      <div class="big" id="totalEngineers">0</div>
+      <div class="meta">Engineers</div>
+    </div>
+    <div class="card">
+      <div class="big" id="activeProjects">0</div>
+      <div class="meta">Active Projects</div>
+    </div>
+  </div>
+  
+  <!-- Quick Actions Section -->
+<div class="quick-actions">
+  <h3>⚡ Quick Actions</h3>
+  <div class="quick-buttons">
+    <button class="quick-btn" id="quickProjectCreatorBtn">
+      🚀 Quick Project Creator
+    </button>
+    <button class="quick-btn" id="refreshDataBtn">
+      🔄 Refresh Data
+    </button>
+    <button class="quick-btn" id="addSampleDataBtn">
+      📊 Add Sample Data
+    </button>
+    <button class="quick-btn" id="deadlineManagerBtn">
+      📅 Manage Deadlines
+    </button>
+    <button class="quick-btn" id="openSheetsBtn">
+      📊 Open Sheets
+    </button>
+    <!-- ADD THE WEEKLY REPORTS BUTTON HERE -->
+    <button class="quick-btn" id="weeklyReportsBtn">
+      📊 Weekly Reports
+    </button>
+  </div>
+</div>
+  
+  <!-- Filters -->
+  <div class="filters-row">
+    <div class="filter-group">
+      <label>Filter by Project</label>
+      <select id="projectFilter">
+        <option value="all">All Projects</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Filter by Status</label>
+      <select id="statusFilter">
+        <option value="all">All Status</option>
+        <option value="Done">Done</option>
+        <option value="Ongoing">Ongoing</option>
+        <option value="Waiting">Waiting</option>
+      </select>
+    </div>
+  </div>
+  
+  <div id="chart_dept" class="chart"></div>
+  <div id="chart_status" class="chart"></div>
+  <div id="chart_timeline" class="chart"></div>
+
+  <div style="margin-top:12px;">
+    <button class="btn small" id="exportExcelBtn">Export Excel</button>
+    <button class="btn small" id="exportPdfBtn">Export PDF</button>
+  </div>
+</aside>
+
+<script>
+// Add event listeners for manager panel buttons
+document.addEventListener('DOMContentLoaded', function() {
+  // Quick Project Creator button
+  const quickProjectBtn = document.getElementById('quickProjectCreatorBtn');
+  if (quickProjectBtn) {
+    quickProjectBtn.addEventListener('click', function() {
+      if (typeof ProjectCreator !== 'undefined') {
+        ProjectCreator.openSimpleProjectCreator();
+      } else {
+        console.error('ProjectCreator not defined');
+        Utils.showNotification('Project Creator not available', 'error');
+      }
+    });
+  }
+
+  // Refresh Data button
+  const refreshBtn = document.getElementById('refreshDataBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', function() {
+      Dashboard.refreshAllData();
+    });
+  }
+
+  // Add Sample Data button
+  const sampleDataBtn = document.getElementById('addSampleDataBtn');
+  if (sampleDataBtn) {
+    sampleDataBtn.addEventListener('click', function() {
+      Dashboard.addSampleData();
+    });
+  }
+
+  // Deadline Manager button
+  const deadlineBtn = document.getElementById('deadlineManagerBtn');
+  if (deadlineBtn) {
+    deadlineBtn.addEventListener('click', function() {
+      Dashboard.showDeadlineManager();
+    });
+  }
+
+  // Open Sheets button
+  const sheetsBtn = document.getElementById('openSheetsBtn');
+  if (sheetsBtn) {
+    sheetsBtn.addEventListener('click', function() {
+      Dashboard.openSheets();
+    });
+  }
+
+  // Logout button
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', function() {
+      Dashboard.logout();
+    });
+  }
+
+  // REMOVED THE HTML BUTTON FROM HERE
+
+  // Export buttons
+  const exportExcelBtn = document.getElementById('exportExcelBtn');
+  if (exportExcelBtn) {
+    exportExcelBtn.addEventListener('click', function() {
+      Dashboard.exportData('excel');
+    });
+  }
+
+  const exportPdfBtn = document.getElementById('exportPdfBtn');
+  if (exportPdfBtn) {
+    exportPdfBtn.addEventListener('click', function() {
+      Dashboard.exportData('pdf');
+    });
+  }
+});
+</script>
